@@ -1,0 +1,70 @@
+# LabHit Pipeline Definition
+# This file defines a CI/CD pipeline using LabHit's engine.
+#
+# Key concepts:
+#   use:     Invoke an extension by category/name (e.g. source/git)
+#   after:   Declare dependencies between stages (builds a DAG)
+#   sandbox: Configure the isolated execution environment
+#   gate:    Enforce policy before a stage runs
+#   run:     Execute an inline command (no extension needed)
+#   with:    Pass configuration to an extension
+engine: "1"
+
+pipeline:
+  name: build-and-deploy
+  description: "Example CI/CD pipeline demonstrating LabHit features"
+
+triggers:
+  push:
+    branches: [main, "release/*"]
+  pull_request:
+    branches: [main]
+  manual: {}
+
+stages:
+  fetch:
+    use: source/git
+    with:
+      depth: 1
+
+  lint:
+    after: [fetch]
+    run: cargo clippy -- -D warnings
+    sandbox:
+      image: rust:1.77-slim
+
+  test:
+    after: [fetch]
+    run: cargo test --workspace
+    sandbox:
+      image: rust:1.77-slim
+      resources:
+        cpu: 2
+        memory: 4Gi
+
+  build:
+    after: [lint, test]
+    use: build/container
+    with:
+      context: "."
+      dockerfile: Dockerfile
+      tags:
+        - "${{ var.registry }}/app:${{ run.sha_short }}"
+        - "${{ var.registry }}/app:latest"
+
+  scan:
+    after: [build]
+    use: scan/trivy
+    with:
+      target: "${{ stage.build.output.image }}"
+      fail_on: [critical, high]
+
+  deploy:
+    after: [build, scan]
+    use: deploy/kubernetes
+    with:
+      manifests: ./k8s/
+      namespace: "${{ var.environment }}"
+    gate:
+      approval: required
+      policy: production-deploy

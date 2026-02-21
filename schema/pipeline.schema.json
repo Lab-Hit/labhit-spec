@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://labhit.dev/schemas/pipeline.schema.json",
+  "title": "LabHit Pipeline Definition",
+  "description": "JSON Schema for validating .labhit/pipeline.yaml files.",
+  "type": "object",
+  "required": ["engine", "pipeline", "stages"],
+  "additionalProperties": false,
+  "properties": {
+    "engine": {
+      "type": "string",
+      "description": "Engine schema version. Currently only '1' is supported.",
+      "enum": ["1"]
+    },
+    "pipeline": {
+      "type": "object",
+      "description": "Pipeline metadata.",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "Unique pipeline name (lowercase, alphanumeric, dashes)."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable pipeline description."
+        }
+      }
+    },
+    "triggers": {
+      "type": "object",
+      "description": "Events that start the pipeline.",
+      "additionalProperties": false,
+      "properties": {
+        "push": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "branches": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Branch patterns to match on push events."
+            },
+            "tags": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Tag patterns to match on push events."
+            },
+            "paths": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "File path patterns that must be changed to trigger."
+            }
+          }
+        },
+        "pull_request": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "branches": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Target branch patterns for pull request triggers."
+            },
+            "actions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["opened", "synchronize", "reopened", "closed"]
+              },
+              "description": "PR actions that trigger the pipeline."
+            }
+          }
+        },
+        "schedule": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cron": {
+              "type": "string",
+              "description": "Cron expression for scheduled runs."
+            },
+            "timezone": {
+              "type": "string",
+              "description": "IANA timezone (e.g. 'America/New_York')."
+            }
+          }
+        },
+        "manual": {
+          "type": "object",
+          "description": "Allow manual triggering. Empty object enables it.",
+          "additionalProperties": false,
+          "properties": {
+            "inputs": {
+              "type": "object",
+              "description": "Named inputs the user must provide when triggering manually.",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["string", "boolean", "choice"]
+                  },
+                  "description": { "type": "string" },
+                  "default": { "type": "string" },
+                  "options": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "webhook": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "secret_name": {
+              "type": "string",
+              "description": "Name of the secret used to verify webhook signatures."
+            },
+            "filter": {
+              "type": "string",
+              "description": "CEL expression to filter incoming webhook payloads."
+            }
+          }
+        }
+      }
+    },
+    "stages": {
+      "type": "object",
+      "description": "Pipeline stages. Keys are stage names; order is determined by `after` dependencies.",
+      "additionalProperties": {
+        "$ref": "#/$defs/stage"
+      },
+      "minProperties": 1
+    }
+  },
+  "$defs": {
+    "stage": {
+      "type": "object",
+      "description": "A single pipeline stage definition.",
+      "additionalProperties": false,
+      "properties": {
+        "use": {
+          "type": "string",
+          "pattern": "^[a-z]+/[a-z][a-z0-9-]*$",
+          "description": "Extension to invoke, in category/name format (e.g. 'source/git')."
+        },
+        "run": {
+          "type": "string",
+          "description": "Inline shell command to execute (mutually exclusive with `use`)."
+        },
+        "after": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Stages that must complete before this stage runs (DAG edges)."
+        },
+        "with": {
+          "type": "object",
+          "description": "Configuration parameters passed to the extension.",
+          "additionalProperties": true
+        },
+        "sandbox": {
+          "$ref": "#/$defs/sandbox"
+        },
+        "gate": {
+          "$ref": "#/$defs/gate"
+        },
+        "timeout": {
+          "type": "string",
+          "pattern": "^[0-9]+(s|m|h)$",
+          "description": "Maximum execution time (e.g. '10m', '1h')."
+        },
+        "retry": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_attempts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            },
+            "backoff": {
+              "type": "string",
+              "enum": ["fixed", "exponential"]
+            }
+          }
+        },
+        "condition": {
+          "type": "string",
+          "description": "CEL expression evaluated at runtime; stage is skipped if false."
+        }
+      },
+      "oneOf": [
+        { "required": ["use"] },
+        { "required": ["run"] }
+      ]
+    },
+    "sandbox": {
+      "type": "object",
+      "description": "Isolated execution environment configuration.",
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "type": "string",
+          "description": "Container image for the sandbox."
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cpu": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Number of CPU cores."
+            },
+            "memory": {
+              "type": "string",
+              "pattern": "^[0-9]+(Mi|Gi)$",
+              "description": "Memory limit (e.g. '512Mi', '4Gi')."
+            }
+          }
+        },
+        "env": {
+          "type": "object",
+          "description": "Environment variables injected into the sandbox.",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "gate": {
+      "type": "object",
+      "description": "Policy gate that must pass before the stage executes.",
+      "additionalProperties": false,
+      "properties": {
+        "approval": {
+          "type": "string",
+          "enum": ["required", "optional"],
+          "description": "Whether human approval is required."
+        },
+        "policy": {
+          "type": "string",
+          "description": "Name of the policy to evaluate."
+        },
+        "allowed_branches": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Restrict execution to specific branches."
+        }
+      }
+    }
+  }
+}

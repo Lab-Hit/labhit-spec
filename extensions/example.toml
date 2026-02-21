@@ -1,0 +1,31 @@
+# Example extension manifest.
+# This file demonstrates the TOML manifest format for LabHit extensions.
+# Replace the values below with your extension's actual configuration.
+
+[extension]
+name = "my-extension"
+category = "build"                   # One of: source, build, test, scan, deploy, notify, gate
+version = "0.1.0"
+description = "A short description of what this extension does"
+author = "Your Name"
+license = "Apache-2.0"
+
+[extension.compatibility]
+engine_version = ">=0.1.0"
+
+[extension.capabilities]
+network = ["example.com"]            # Allowed network destinations (deny-by-default)
+filesystem = { workspace = "write" } # Workspace access: "read", "write", or "none"
+secrets = ["api_token"]              # Secret names this extension reads
+
+[extension.resources]
+max_memory_mb = 256
+max_cpu_ms = 60000
+max_execution_time_s = 300
+
+[extension.inputs]
+greeting = { type = "string", default = "hello", description = "A greeting message" }
+verbose = { type = "bool", default = "false", description = "Enable verbose output" }
+
+[extension.outputs]
+result = { type = "string", description = "The extension result" }

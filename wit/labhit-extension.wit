@@ -1,0 +1,83 @@
+package labhit:extension@1.0.0;
+
+/// The core interface every LabHit extension must implement.
+interface pipeline-step {
+    /// Input provided to the extension by the engine.
+    record step-input {
+        /// Pipeline execution context.
+        context: pipeline-context,
+        /// Configuration parameters from the `with:` block.
+        config: list<config-entry>,
+        /// Artifacts from upstream stages.
+        inputs: list<artifact-ref>,
+    }
+
+    record pipeline-context {
+        pipeline-id: string,
+        pipeline-name: string,
+        stage-name: string,
+        run-id: string,
+        commit-sha: string,
+        branch: string,
+        workspace-path: string,
+    }
+
+    record config-entry {
+        key: string,
+        value: string,
+    }
+
+    record artifact-ref {
+        name: string,
+        path: string,
+        content-hash: string,
+    }
+
+    /// Output returned by the extension to the engine.
+    record step-output {
+        status: execution-status,
+        artifacts: list<artifact-ref>,
+        metadata: list<config-entry>,
+    }
+
+    enum execution-status {
+        success,
+        failure,
+        skipped,
+        warning,
+    }
+
+    enum log-level {
+        debug,
+        info,
+        warn,
+        error,
+    }
+
+    /// Execute the extension logic.
+    execute: func(input: step-input) -> result<step-output, string>;
+}
+
+/// Host capabilities provided by the engine to extensions.
+/// Extensions must declare which capabilities they need in their manifest.
+interface host-capabilities {
+    use pipeline-step.{log-level};
+
+    /// Retrieve a secret by name (resolved via workload identity attestation, never stored in LabHit).
+    get-secret: func(name: string) -> result<string, string>;
+
+    /// Write a structured log entry.
+    log: func(level: log-level, message: string);
+
+    /// Read a file from the workspace (sandbox-scoped).
+    read-file: func(path: string) -> result<list<u8>, string>;
+
+    /// Write a file to the workspace (sandbox-scoped).
+    write-file: func(path: string, data: list<u8>) -> result<_, string>;
+}
+
+/// The world that a LabHit extension inhabits.
+world labhit-extension {
+    import host-capabilities;
+    export pipeline-step;
+}

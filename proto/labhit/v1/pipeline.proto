@@ -1,0 +1,112 @@
+syntax = "proto3";
+
+package labhit.v1;
+
+option go_package = "labhit/v1;labhitv1";
+
+// PipelineService provides gRPC endpoints for pipeline orchestration.
+service PipelineService {
+  // TriggerPipeline starts a new pipeline run.
+  rpc TriggerPipeline(TriggerRequest) returns (PipelineRunResponse);
+
+  // GetPipelineRun retrieves the current state of a pipeline run.
+  rpc GetPipelineRun(GetPipelineRunRequest) returns (PipelineRunResponse);
+
+  // StreamLogs streams log entries from a running pipeline in real time.
+  rpc StreamLogs(StreamLogsRequest) returns (stream LogEntry);
+}
+
+// TriggerRequest initiates a pipeline run.
+message TriggerRequest {
+  // Path to the pipeline definition file (e.g. ".labhit/pipeline.yaml").
+  string pipeline_path = 1;
+
+  // Git reference to build (branch, tag, or SHA).
+  string git_ref = 2;
+
+  // Optional key-value variables passed to the pipeline.
+  map<string, string> variables = 3;
+
+  // Trigger source (e.g. "push", "pull_request", "manual", "webhook").
+  string trigger_source = 4;
+}
+
+// GetPipelineRunRequest identifies a specific pipeline run.
+message GetPipelineRunRequest {
+  string run_id = 1;
+}
+
+// StreamLogsRequest specifies which logs to stream.
+message StreamLogsRequest {
+  string run_id = 1;
+
+  // Optional: filter to a specific stage. Empty means all stages.
+  string stage_name = 2;
+
+  // If true, keep the stream open and send new entries as they arrive.
+  bool follow = 3;
+}
+
+// PipelineRunResponse represents the full state of a pipeline run.
+message PipelineRunResponse {
+  string run_id = 1;
+  string pipeline_name = 2;
+  StageStatus overall_status = 3;
+  string commit_sha = 4;
+  string branch = 5;
+  string trigger_source = 6;
+
+  // Per-stage status breakdown.
+  repeated StageDetail stages = 7;
+
+  // Timestamps in RFC 3339 format.
+  string started_at = 8;
+  string finished_at = 9;
+}
+
+// StageDetail describes the state of a single pipeline stage.
+message StageDetail {
+  string name = 1;
+  StageStatus status = 2;
+  string started_at = 3;
+  string finished_at = 4;
+  string error_message = 5;
+
+  // Extension that executed this stage (e.g. "source/git"), empty for inline `run:` stages.
+  string extension = 6;
+}
+
+// LogEntry represents a single structured log line from a stage.
+message LogEntry {
+  string run_id = 1;
+  string stage_name = 2;
+  LogLevel level = 3;
+  string message = 4;
+
+  // Timestamp in RFC 3339 format.
+  string timestamp = 5;
+
+  // Optional structured metadata.
+  map<string, string> metadata = 6;
+}
+
+// StageStatus enumerates the possible states of a stage or overall pipeline.
+enum StageStatus {
+  STAGE_STATUS_UNSPECIFIED = 0;
+  STAGE_STATUS_PENDING = 1;
+  STAGE_STATUS_RUNNING = 2;
+  STAGE_STATUS_SUCCESS = 3;
+  STAGE_STATUS_FAILURE = 4;
+  STAGE_STATUS_SKIPPED = 5;
+  STAGE_STATUS_CANCELLED = 6;
+  STAGE_STATUS_WAITING_APPROVAL = 7;
+}
+
+// LogLevel mirrors the log-level enum from the WIT interface.
+enum LogLevel {
+  LOG_LEVEL_UNSPECIFIED = 0;
+  LOG_LEVEL_DEBUG = 1;
+  LOG_LEVEL_INFO = 2;
+  LOG_LEVEL_WARN = 3;
+  LOG_LEVEL_ERROR = 4;
+}
