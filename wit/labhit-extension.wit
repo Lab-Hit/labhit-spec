@@ -76,8 +76,99 @@ interface host-capabilities {
     write-file: func(path: string, data: list<u8>) -> result<_, string>;
 }
 
+/// Optional intelligence hooks that extensions may implement.
+/// These are opt-in -- extensions that do not export these functions are unaffected.
+interface intelligence-hooks {
+    use pipeline-step.{pipeline-context, config-entry};
+
+    /// A file changed in the current diff.
+    record file-diff {
+        path: string,
+        change-type: change-type,
+        lines-added: u32,
+        lines-removed: u32,
+    }
+
+    enum change-type {
+        added,
+        modified,
+        deleted,
+        renamed,
+    }
+
+    /// A test recommended for execution based on the current diff.
+    record test-recommendation {
+        test-name: string,
+        confidence: f64,
+        reason: string,
+    }
+
+    /// Root cause analysis of a pipeline failure.
+    record failure-analysis {
+        category: failure-category,
+        confidence: f64,
+        summary: string,
+        suggestion: string,
+        relevant-lines: list<string>,
+    }
+
+    enum failure-category {
+        compilation-error,
+        test-failure,
+        dependency-resolution,
+        timeout,
+        out-of-memory,
+        permission-denied,
+        network-error,
+        configuration-error,
+        unknown,
+    }
+
+    /// A detected anomaly in pipeline metrics.
+    record anomaly {
+        metric-name: string,
+        current-value: f64,
+        expected-mean: f64,
+        expected-stddev: f64,
+        severity: anomaly-severity,
+    }
+
+    enum anomaly-severity {
+        low,
+        medium,
+        high,
+        critical,
+    }
+
+    /// Pipeline run metrics for anomaly detection.
+    record pipeline-metrics {
+        duration-ms: u64,
+        memory-peak-bytes: u64,
+        cpu-time-ms: u64,
+        artifact-size-bytes: u64,
+        test-count: u32,
+        test-failures: u32,
+    }
+
+    /// Select tests to run based on code changes.
+    select-tests: func(context: pipeline-context, diffs: list<file-diff>) -> result<list<test-recommendation>, string>;
+
+    /// Analyze a stage failure and classify the root cause.
+    analyze-failure: func(context: pipeline-context, log-output: string) -> result<failure-analysis, string>;
+
+    /// Detect anomalies in pipeline metrics.
+    detect-anomaly: func(context: pipeline-context, metrics: pipeline-metrics) -> result<list<anomaly>, string>;
+}
+
 /// The world that a LabHit extension inhabits.
 world labhit-extension {
     import host-capabilities;
     export pipeline-step;
+}
+
+/// Extended world for extensions that provide intelligence hooks.
+world labhit-intelligence-extension {
+    import host-capabilities;
+    export pipeline-step;
+    export intelligence-hooks;
 }
