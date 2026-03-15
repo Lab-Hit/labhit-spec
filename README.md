@@ -89,15 +89,18 @@ Full definitions: [`proto/labhit/v1/pipeline.proto`](proto/labhit/v1/pipeline.pr
 
 Follows [SemVer](https://semver.org/). While on `0.x`, minor bumps may break compatibility. All breaking changes are listed in the [CHANGELOG](CHANGELOG.md).
 
-Current version: **0.1.0**
+Current spec version: **1.0.0** (WIT interface frozen)
+Engine version: **0.3.0**
 
 ## Links
 
 | Resource | Status |
 |----------|--------|
-| Engine source | Not yet public (Apache 2.0, will be published separately) |
-| Extension registry | In development |
+| Engine source | Pre-launch (Apache 2.0, will be published separately) |
+| Extension marketplace | [app.labhit.dev/marketplace](https://app.labhit.dev/marketplace) |
+| CLI install | `curl -fsSL https://api.labhit.dev/install \| sh` |
 | [labhit.dev](https://labhit.dev) | Live |
+| [app.labhit.dev](https://app.labhit.dev) | Live (sign in with GitHub) |
 
 ## Contributing
 
